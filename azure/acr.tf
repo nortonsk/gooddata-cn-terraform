@@ -146,7 +146,19 @@ resource "azurerm_container_registry_credential_set" "dockerio" {
   }
 }
 
-# Grant ACR credential set access to Key Vault secrets
+# Wait for ACR credential set managed identity to be ready
+resource "time_sleep" "wait_for_acr_identity" {
+  count = var.acr_cache_images ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [
+    azurerm_container_registry_credential_set.dockerio
+  ]
+}
+
+# Grant ACR credential set managed identity access to Key Vault secrets
+# This is CRITICAL for ACR pull-through cache to authenticate with Docker Hub
 resource "azurerm_key_vault_access_policy" "acr_credential_set" {
   count = var.acr_cache_images ? 1 : 0
 
@@ -159,6 +171,7 @@ resource "azurerm_key_vault_access_policy" "acr_credential_set" {
   ]
 
   depends_on = [
-    azurerm_container_registry_credential_set.dockerio
+    azurerm_container_registry_credential_set.dockerio,
+    time_sleep.wait_for_acr_identity
   ]
 }
